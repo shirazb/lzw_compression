@@ -53,6 +53,5 @@ dkms.conf
 
 # CLion Settings and Build Files
 .idea/
-CMakeLists.txt
 cmake-build-debug/
 
