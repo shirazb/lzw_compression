@@ -98,9 +98,7 @@ void lzw_decompress(struct lzw_decompressor *lzw) {
  * @param lzw The decompressor in question.
  * @return true is there is an error, false otherwise.
  */
-bool lzw_has_error(
-        struct lzw_decompressor *lzw
-) {
+bool lzw_has_error(struct lzw_decompressor *lzw) {
     assert(lzw);
 
     return lzw->error != LZW_OKAY;
