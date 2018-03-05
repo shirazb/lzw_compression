@@ -2,7 +2,12 @@
 #include <assert.h>
 #include "lzw_decompressor.h"
 
-// Order of msgs and num errors must reflect enum.
+/* To add a new type of error:
+ *     1. Add it to `enum lzw_error` in the header.
+ *     2. Increment `NUM_LZW_ERRORS`.
+ *     3. Add the corresponding error message to the below array, keeping the
+ *        messages in the same order as the errors in the enum.
+ */
 #define NUM_LZW_ERRORS 4
 static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
         "Unknown error",
