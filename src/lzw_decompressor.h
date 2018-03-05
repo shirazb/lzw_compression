@@ -11,7 +11,8 @@ enum lzw_error {
     LZW_UNKNOWN_ERROR,
     LZW_OKAY,
     LZW_FAIL_OPEN_SRC,
-    LZW_FAIL_OPEN_DST
+    LZW_FAIL_OPEN_DST,
+    LZW_HEAP_ERROR
 };
 
 struct lzw_decompressor {
@@ -22,7 +23,7 @@ struct lzw_decompressor {
     struct lzw_dict dict;      // LZW dictionary used in decompression.
 };
 
-void lzw_init(
+enum lzw_error lzw_init(
         struct lzw_decompressor *lzw,
         size_t code_length_bits,
         char *src_name,
@@ -33,16 +34,16 @@ void lzw_deinit(
         struct lzw_decompressor *lzw
 );
 
-void lzw_decompress(
+enum lzw_error lzw_decompress(
         struct lzw_decompressor *lzw
 );
 
 bool lzw_has_error(
-        struct lzw_decompressor *lzw
+        enum lzw_error
 );
 
 const char *lzw_error_msg(
-        struct lzw_decompressor *lzw
+        enum lzw_error
 );
 
 #endif //LZW_COMPRESSION_LZW_H

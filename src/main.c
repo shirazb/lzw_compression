@@ -29,18 +29,23 @@ int main(int argc, char *argv[]) {
     /* Perform decompression. */
 
     struct lzw_decompressor lzw;
-    lzw_init(&lzw, CODE_LENGTH_BITS, args.src_file, args.dst_file);
+    enum lzw_error error = lzw_init(
+            &lzw,
+            CODE_LENGTH_BITS,
+            args.src_file,
+            args.dst_file
+    );
 
-    if (lzw_has_error(&lzw)) {
-        fprintf(stderr, "ERROR: %s.\n", lzw_error_msg(&lzw));
+    if (lzw_has_error(error)) {
+        fprintf(stderr, "ERROR: %s.\n", lzw_error_msg(error));
         return EXIT_FAILURE;
     }
 
-    lzw_decompress(&lzw);
+    error = lzw_decompress(&lzw);
 
     int exit_code;
-    if (lzw_has_error(&lzw)) {
-        fprintf(stderr, "ERROR: %s.\n", lzw_error_msg(&lzw));
+    if (lzw_has_error(error)) {
+        fprintf(stderr, "ERROR: %s.\n", lzw_error_msg(error));
         exit_code = EXIT_FAILURE;
     } else {
         exit_code = EXIT_SUCCESS;
