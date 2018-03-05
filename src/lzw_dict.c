@@ -42,11 +42,10 @@ void dict_init(struct lzw_dict *dict, size_t code_length_bits) {
     assert(dict);
 
     // TODO: Protect against ridiculously large array.
-    // Init `size` and `capacity`. Capacity is `2^(code_length_bits + 1) - 1`,
+    // Init `size` and `capacity`. Capacity is `2^code_length_bits - 1`,
     // the number of items that can be represented by `code_length_bits` bits.
     dict->size = 0;
-    dict->capacity = ((size_t) 1 << (code_length_bits + 1)) - 1;
-    printf("%zu\n", dict->capacity);
+    dict->capacity = (size_t) 1 << (code_length_bits);
 
     // TODO: Handle when capacity < size required for ASCII?
 

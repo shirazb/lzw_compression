@@ -58,3 +58,6 @@ cmake-build-debug/
 # Executable
 lzw_decompressor
 
+# Outputted testing files
+test_files/out/
+
