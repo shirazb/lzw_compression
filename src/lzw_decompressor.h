@@ -10,9 +10,10 @@
 enum lzw_error {
     LZW_UNKNOWN_ERROR,
     LZW_OKAY,
-    LZW_FAIL_OPEN_SRC,
-    LZW_FAIL_OPEN_DST,
-    LZW_HEAP_ERROR
+    LZW_OPEN_SRC_ERROR,
+    LZW_OPEN_DST_ERROR,
+    LZW_HEAP_ERROR,
+    LZW_WRITE_DST_ERROR,
 };
 
 struct lzw_decompressor {

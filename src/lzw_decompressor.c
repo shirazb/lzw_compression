@@ -10,20 +10,43 @@
  *     3. Add the corresponding error message to the below array, keeping the
  *        messages in the same order as the errors in the enum.
  */
-#define NUM_LZW_ERRORS 5
+#define NUM_LZW_ERRORS 6
 static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
         "Unknown error",
         "Okay",
         "Failed to open source file",
         "Failed to open destination file",
-        "Heap error"
+        "Heap error",
+        "Failed to write to destination file"
 };
+
+/**
+ * Generates code that will return with the error code if the given `struct
+ * lzw_decompressor` contains an error.
+ *
+ * Evaluates `lzw` once and gets the error, to avoid reevaluating `lzw` which
+ * may be a side-effecting expression.
+ *
+ * Declares this variable in a new scope to avoid name clashes.
+ */
+#define GUARD_ERROR(lzw)\
+{\
+    enum lzw_error __error = (lzw)->error; \
+    if (lzw_has_error(__error)) { \
+        return __error; \
+    }\
+}
 
 static enum lzw_error append_byte_and_add_to_dict(
         struct lzw_decompressor *lzw,
         struct dict_entry *entry,
         uint8_t b,
         struct dict_entry **new_entry
+);
+
+static enum lzw_error write_next(
+        struct lzw_decompressor *lzw,
+        struct dict_entry *entry
 );
 
 /**
@@ -50,14 +73,14 @@ enum lzw_error lzw_init(
 
     lzw->src = src_name ? fopen(src_name, "rb") : NULL;
     if (!lzw->src) {
-        lzw->error = LZW_FAIL_OPEN_SRC;
-        return LZW_FAIL_OPEN_SRC;
+        lzw->error = LZW_OPEN_SRC_ERROR;
+        return LZW_OPEN_SRC_ERROR;
     }
 
     lzw->dst = dst_name ? fopen(dst_name, "wb") : NULL;
     if (!lzw->dst) {
-        lzw->error = LZW_FAIL_OPEN_DST;
-        return LZW_FAIL_OPEN_DST;
+        lzw->error = LZW_OPEN_DST_ERROR;
+        return LZW_OPEN_DST_ERROR;
     }
 
     /* Initialise dictionary. */
@@ -97,9 +120,7 @@ void lzw_deinit(struct lzw_decompressor *lzw) {
 enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
     assert(lzw);
 
-    if (lzw->error != LZW_OKAY) {
-        return lzw->error;
-    }
+    GUARD_ERROR(lzw);
 
     // Write first code to output.
     struct dict_entry *cur_entry = read_and_lookup_next_code(lzw);
@@ -115,26 +136,21 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
             write_next(lzw, cur_entry);
             // FIXME: null ptr on cur_entry->bytes?
             struct dict_entry *new_entry;
-            enum lzw_error error = append_byte_and_add_to_dict(
+            lzw->error = append_byte_and_add_to_dict(
                     lzw, last_entry, cur_entry->bytes[0], &new_entry
             );
 
-            if (error) {
-                lzw->error = error;
-                return error;
-            }
+            GUARD_ERROR(lzw);
         } else {
             struct dict_entry *new_entry;
-            enum lzw_error error = append_byte_and_add_to_dict(
+            lzw->error = append_byte_and_add_to_dict(
                     lzw, last_entry, last_entry->bytes[0], &new_entry
             );
 
-            if (error) {
-                lzw->error = error;
-                return error;
-            }
+            GUARD_ERROR(lzw);
 
-            write_next(lzw, new_entry);
+            lzw->error = write_next(lzw, new_entry);
+            GUARD_ERROR(lzw);
         }
     }
 
@@ -199,4 +215,16 @@ static enum lzw_error append_byte_and_add_to_dict(
     *new_entry = dict_add(&lzw->dict, new_bytes, entry->size + 1);
 
     return LZW_OKAY;
+}
+
+static enum lzw_error
+write_next(struct lzw_decompressor *lzw, struct dict_entry *entry) {
+    size_t written = fwrite(
+            entry->bytes,
+            sizeof(uint8_t),
+            entry->size,
+            lzw->dst
+    );
+
+    return entry->size == written ? LZW_OKAY : LZW_WRITE_DST_ERROR;
 }
