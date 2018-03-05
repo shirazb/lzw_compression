@@ -16,6 +16,8 @@ static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
         "Failed to open destination file"
 };
 
+static void deinit(struct lzw_decompressor *lzw);
+
 /**
  * Initialises a new LZW decompressor. Takes input from a binary file and
  * writes decompressed output to a binary file.
@@ -54,6 +56,9 @@ void lzw_init(
 /**
  * Decompresses an LZW compressed file.
  * TODO: Document exact details from spec.
+ *
+ * Will de-initialise the `lzw_decompressor` internally (free memory, close
+ * files, etc).
  * @param lzw Defines parameters of LZW decompressor.
  * @return true if successful, false otherwise.
  */
@@ -61,8 +66,11 @@ void lzw_decompress(struct lzw_decompressor *lzw) {
     assert(lzw);
 
     if (lzw->error != LZW_OKAY) {
+        deinit(lzw);
         return;
     }
+
+    deinit(lzw);
 }
 
 /**
@@ -93,4 +101,22 @@ const char *lzw_error_msg(struct lzw_decompressor *lzw) {
     }
 
     return lzw_error_msgs[error];
+}
+
+/**
+ * Cleans up decompressor.
+ * @param lzw
+ */
+static void deinit(struct lzw_decompressor *lzw) {
+    assert(lzw);
+
+    /* Close files if opened. */
+
+    if (lzw->src) {
+        fclose(lzw->src);
+    }
+
+    if (lzw->dst) {
+        fclose(lzw->dst);
+    }
 }
