@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <assert.h>
 #include <stdlib.h>
+#include <string.h>
 #include "lzw_decompressor.h"
 
 /* To add a new type of error:
@@ -9,13 +10,21 @@
  *     3. Add the corresponding error message to the below array, keeping the
  *        messages in the same order as the errors in the enum.
  */
-#define NUM_LZW_ERRORS 4
+#define NUM_LZW_ERRORS 5
 static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
         "Unknown error",
         "Okay",
         "Failed to open source file",
-        "Failed to open destination file"
+        "Failed to open destination file",
+        "Heap error"
 };
+
+static enum lzw_error append_byte_and_add_to_dict(
+        struct lzw_decompressor *lzw,
+        struct dict_entry *entry,
+        uint8_t b,
+        struct dict_entry **new_entry
+);
 
 /**
  * Initialises a new LZW decompressor. Takes input from a binary file and
@@ -33,7 +42,7 @@ void lzw_init(
 ) {
     assert(lzw);
 
-    /* File names and code length. */
+    /* Code length. */
 
     lzw->code_length_bits = code_length_bits;
 
@@ -71,7 +80,6 @@ void lzw_deinit(struct lzw_decompressor *lzw) {
     assert(lzw->dst);
     fclose(lzw->dst);
 
-
     /* De-initialise the dictionary. */
     dict_deinit(&lzw->dict);
 }
@@ -91,12 +99,36 @@ void lzw_decompress(struct lzw_decompressor *lzw) {
     if (lzw->error != LZW_OKAY) {
         return;
     }
+
+    // Write first code to output.
+    struct dict_entry *cur_entry = read_and_lookup_next_code(lzw);
+    write_next(lzw, cur_entry);
+
+    struct dict_entry *last_entry;
+
+    while (has_codes_remaining(lzw)) {
+        last_entry = cur_entry;
+        cur_entry = read_and_lookup_next_code(lzw);
+
+        if (cur_entry) {
+            write_next(lzw, cur_entry);
+            // FIXME: null ptr on cur_entry->bytes?
+            append_byte_and_add_to_dict(lzw, last_entry, cur_entry->bytes[0]);
+        } else {
+            struct dict_entry *new_entry = append_byte_and_add_to_dict(
+                    lzw, last_entry, last_entry->bytes[0]
+            );
+            write_next(lzw, new_entry);
+        }
+    }
+
+    assert(lzw->error == LZW_OKAY);
 }
 
 /**
  * Says whether or not a `struct lzw_decompressor` has an error.
  * @param lzw The decompressor in question.
- * @return true is there is an error, false otherwise.
+ * @return true if there is an error, false otherwise.
  */
 bool lzw_has_error(struct lzw_decompressor *lzw) {
     assert(lzw);
@@ -113,6 +145,7 @@ const char *lzw_error_msg(struct lzw_decompressor *lzw) {
     assert(lzw);
 
     enum lzw_error error = lzw->error;
+
     // If error is unknown, set error to LZW_UNKNOWN_ERROR.
     if (!(0 <= error && error < NUM_LZW_ERRORS)) {
         error = LZW_UNKNOWN_ERROR;
@@ -121,3 +154,35 @@ const char *lzw_error_msg(struct lzw_decompressor *lzw) {
     return lzw_error_msgs[error];
 }
 
+/**
+ * In newly allocated memory, copies over the given entry plus the given byte
+ * appended at the end, then inserts this into the dictionary. Places the
+ * newly created entry into `new_entry`. Returns an LZW error code.
+ * @param lzw The `struct lzw_decompressor` containing the dictionary.
+ * @param entry The dictionary entry to append to.
+ * @param b The byte to append.
+ * @param new_entry Blank entry passed in that will be set to the newly
+ * created entry.
+ * @return `enum lzw_error` error code.
+ */
+static enum lzw_error append_byte_and_add_to_dict(
+        struct lzw_decompressor *lzw,
+        struct dict_entry *entry,
+        uint8_t b,
+        struct dict_entry **new_entry
+) {
+    size_t entry_size = sizeof(uint8_t) * entry->size;
+    size_t new_entry_size = sizeof(uint8_t) * (entry->size + 1);
+
+    uint8_t *new_bytes = malloc(new_entry_size);
+    if (!new_bytes) {
+        return LZW_HEAP_ERROR;
+    }
+
+    memcpy(new_bytes, entry->bytes, entry_size);
+    new_bytes[entry->size + 1] = b;
+
+    *new_entry = dict_add(&lzw->dict, new_bytes, entry->size + 1);
+
+    return LZW_OKAY;
+}

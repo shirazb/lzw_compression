@@ -38,15 +38,17 @@ int main(int argc, char *argv[]) {
 
     lzw_decompress(&lzw);
 
+    int exit_code;
     if (lzw_has_error(&lzw)) {
         fprintf(stderr, "ERROR: %s.\n", lzw_error_msg(&lzw));
-        lzw_deinit(&lzw);
-        return EXIT_FAILURE;
+        exit_code = EXIT_FAILURE;
+    } else {
+        exit_code = EXIT_SUCCESS;
     }
 
     lzw_deinit(&lzw);
 
-    return EXIT_SUCCESS;
+    return exit_code;
 }
 
 /*
