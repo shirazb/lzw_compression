@@ -16,6 +16,14 @@ static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
         "Failed to open destination file"
 };
 
+/**
+ * Initialises a new LZW decompressor. Takes input from a binary file and
+ * writes decompressed output to a binary file.
+ * @param lzw The lzw_decompressor to initialise.
+ * @param code_length_bits The length in bits of the codes in the source.
+ * @param src_name Path to the source file.
+ * @param dst_name Path to the destination file.
+ */
 void lzw_init(
         struct lzw_decompressor *lzw,
         size_t code_length_bits,
