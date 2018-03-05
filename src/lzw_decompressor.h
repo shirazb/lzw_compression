@@ -14,6 +14,8 @@ enum lzw_error {
     LZW_OPEN_DST_ERROR,
     LZW_HEAP_ERROR,
     LZW_WRITE_DST_ERROR,
+    LZW_READ_ERROR,
+    LZW_INVALID_FORMAT_ERROR,
 };
 
 struct lzw_decompressor {

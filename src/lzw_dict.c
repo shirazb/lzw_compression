@@ -77,6 +77,8 @@ void dict_deinit(struct lzw_dict *dict) {
  * Checks if the code is in the dictionary.
  */
 bool dict_contains(struct lzw_dict *dict, int code) {
+    assert(dict);
+
     // Equivalent to checking if the code is below the current size.
     return code < dict->size;
 }
@@ -105,6 +107,19 @@ struct dict_entry *dict_add(
     new_entry->bytes = bytes;
 
     return new_entry;
+}
+
+/**
+ * Gets the `struct dict_entry` at `code` in the dictionary `dict`. Returns
+ * null if not present.
+ */
+struct dict_entry *dict_get(
+        struct lzw_dict *dict,
+        int code
+) {
+    assert(dict);
+
+    return dict_contains(dict, code) ? dict->entries[code] : NULL;
 }
 
 static void initialise_ascii_table(void) {

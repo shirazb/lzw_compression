@@ -45,6 +45,11 @@ struct dict_entry *dict_add(
         size_t size
 );
 
+struct dict_entry *dict_get(
+        struct lzw_dict *dict,
+        int code
+);
+
 void dict_deinit(
         struct lzw_dict *dict
 );

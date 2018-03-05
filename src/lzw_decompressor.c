@@ -10,14 +10,16 @@
  *     3. Add the corresponding error message to the below array, keeping the
  *        messages in the same order as the errors in the enum.
  */
-#define NUM_LZW_ERRORS 6
+#define NUM_LZW_ERRORS 8
 static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
         "Unknown error",
         "Okay",
         "Failed to open source file",
         "Failed to open destination file",
         "Heap error",
-        "Failed to write to destination file"
+        "Failed to write to destination file",
+        "Failed to read from the source file",
+        "File is not in a valid LZW-encoded format"
 };
 
 /**
@@ -50,6 +52,11 @@ static enum lzw_error write_next(
 );
 
 static bool has_codes_remaining(struct lzw_decompressor *lzw);
+
+static enum lzw_error read_and_lookup_next_code(
+        struct lzw_decompressor *lzw,
+        struct dict_entry **cur_entry
+);
 
 /**
  * Initialises a new LZW decompressor. Takes input from a binary file and
@@ -124,31 +131,50 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
 
     GUARD_ERROR(lzw);
 
-    // Write first code to output.
-    struct dict_entry *cur_entry = read_and_lookup_next_code(lzw);
-    write_next(lzw, cur_entry);
+    // Read the first code and look it up in the dictionary.
+    struct dict_entry *cur_entry;
+    lzw->error = read_and_lookup_next_code(lzw, &cur_entry);
+    GUARD_ERROR(lzw);
+
+    // First code should be in the dictionary, otherwise invalid encoding.
+    if (!cur_entry) {
+        lzw->error = LZW_INVALID_FORMAT_ERROR;
+        return lzw->error;
+    }
+
+    // Write the first retrieved entry to the output.
+    lzw->error = write_next(lzw, cur_entry);
+    GUARD_ERROR(lzw);
 
     struct dict_entry *last_entry;
 
+    // Keep decompressing until all codes in the input file have been consumed.
     while (has_codes_remaining(lzw)) {
+        // Update last and cur entry.
         last_entry = cur_entry;
-        cur_entry = read_and_lookup_next_code(lzw);
+        lzw->error = read_and_lookup_next_code(lzw, &cur_entry);
+        GUARD_ERROR(lzw);
 
+        // If code is in the dictionary, write the current entry and add
+        // <last entry><first byte of cur entry> to dictionary.
         if (cur_entry) {
-            write_next(lzw, cur_entry);
+            lzw->error = write_next(lzw, cur_entry);
+            GUARD_ERROR(lzw);
+
             // FIXME: null ptr on cur_entry->bytes?
             struct dict_entry *new_entry;
             lzw->error = append_byte_and_add_to_dict(
                     lzw, last_entry, cur_entry->bytes[0], &new_entry
             );
-
             GUARD_ERROR(lzw);
+
+        // If code is not in the dictionary, add <last entry><first byte of
+        // last entry> to the dictionary, and write that to the output.
         } else {
             struct dict_entry *new_entry;
             lzw->error = append_byte_and_add_to_dict(
                     lzw, last_entry, last_entry->bytes[0], &new_entry
             );
-
             GUARD_ERROR(lzw);
 
             lzw->error = write_next(lzw, new_entry);
@@ -156,7 +182,7 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
         }
     }
 
-    assert(lzw->error == LZW_OKAY);
+    assert(!lzw_has_error(lzw->error));
     return lzw->error;
 }
 
@@ -240,4 +266,30 @@ static bool has_codes_remaining(struct lzw_decompressor *lzw) {
     assert(lzw->src);
 
     return feof(lzw->src) == 0;
+}
+
+/**
+ * Reads the next code from the source file, looks it up in the dictionary.
+ * Sets `cur_entry` to be the returned entry (null if not present). Returns
+ * an error code, erroring if the read failed. Note, the code not being in
+ * the dictionary is ok, so does not result in an error.
+ * @param lzw The decompressor.
+ * @param cur_entry The entry found in the dictionary will be assigned to this.
+ * @return LZW_READ_ERROR if error whilst reading, else LZW_OKAY.
+ */
+static enum lzw_error read_and_lookup_next_code(
+        struct lzw_decompressor *lzw,
+        struct dict_entry **cur_entry
+) {
+    assert(lzw);
+    assert(!lzw_has_error(lzw->error));
+    assert(lzw->src);
+    assert(has_codes_remaining(lzw));
+
+    // TODO: Read code.
+    int code = 0;
+
+    *cur_entry = dict_get(&lzw->dict, code);
+
+    return LZW_OKAY;
 }
