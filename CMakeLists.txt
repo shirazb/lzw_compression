@@ -15,12 +15,12 @@ include_directories(src)
 # Setup src files, header files, executable file, and add executable.
 
 set(LZW_SOURCE_FILES
-        )
+        src/lzw_decompressor.c)
 
 set(LZW_HEADER_FILES
-        )
+        src/lzw_decompressor.h)
 
-set(LZW_EXECUTABLE src/lzw_decompressor.c)
+set(LZW_EXECUTABLE src/main.c)
 
 
 add_executable(lzw_decompressor ${LZW_EXECUTABLE} ${LZW_SOURCE_FILES}
