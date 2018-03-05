@@ -1,5 +1,6 @@
 #include <stddef.h>
 #include <assert.h>
+#include <stdlib.h>
 #include "lzw_decompressor.h"
 
 /* To add a new type of error:
@@ -15,8 +16,6 @@ static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
         "Failed to open source file",
         "Failed to open destination file"
 };
-
-static void deinit(struct lzw_decompressor *lzw);
 
 /**
  * Initialises a new LZW decompressor. Takes input from a binary file and
@@ -34,23 +33,47 @@ void lzw_init(
 ) {
     assert(lzw);
 
-    lzw->code_length_bits = code_length_bits;
-    lzw->src_name = src_name;
-    lzw->dst_name = dst_name;
+    /* File names and code length. */
 
-    lzw->src = fopen(src_name, "rb");
+    lzw->code_length_bits = code_length_bits;
+
+    /* Open source and destination files. */
+
+    lzw->src = src_name ? fopen(src_name, "rb") : NULL;
     if (!lzw->src) {
         lzw->error = LZW_FAIL_OPEN_SRC;
         return;
     }
 
-    lzw->dst = fopen(dst_name, "wb");
+    lzw->dst = dst_name ? fopen(dst_name, "wb") : NULL;
     if (!lzw->dst) {
         lzw->error = LZW_FAIL_OPEN_DST;
         return;
     }
 
+    /* Initialise dictionary. */
+    dict_init(&lzw->dict, lzw->code_length_bits);
+
     lzw->error = LZW_OKAY;
+}
+
+/**
+ * Cleans up decompressor.
+ */
+void lzw_deinit(struct lzw_decompressor *lzw) {
+    assert(lzw);
+
+    /* Close files if opened. */
+
+    assert(lzw->src);
+    fclose(lzw->src);
+
+    assert(lzw->dst);
+    fclose(lzw->dst);
+
+
+    /* De-initialise the dictionary. */
+    dict_deinit(&lzw->dict);
 }
 
 /**
@@ -66,11 +89,8 @@ void lzw_decompress(struct lzw_decompressor *lzw) {
     assert(lzw);
 
     if (lzw->error != LZW_OKAY) {
-        deinit(lzw);
         return;
     }
-
-    deinit(lzw);
 }
 
 /**
@@ -103,20 +123,3 @@ const char *lzw_error_msg(struct lzw_decompressor *lzw) {
     return lzw_error_msgs[error];
 }
 
-/**
- * Cleans up decompressor.
- * @param lzw
- */
-static void deinit(struct lzw_decompressor *lzw) {
-    assert(lzw);
-
-    /* Close files if opened. */
-
-    if (lzw->src) {
-        fclose(lzw->src);
-    }
-
-    if (lzw->dst) {
-        fclose(lzw->dst);
-    }
-}

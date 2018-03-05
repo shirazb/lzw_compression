@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include "lzw_dict.h"
 
 enum lzw_error {
     LZW_UNKNOWN_ERROR,
@@ -14,12 +15,11 @@ enum lzw_error {
 };
 
 struct lzw_decompressor {
-    enum lzw_error error;
-    size_t code_length_bits;
-    char *src_name;
-    char *dst_name;
-    FILE *src;
-    FILE *dst;
+    enum lzw_error error;      // Error code.
+    size_t code_length_bits;   // Length of codes in the source file in bits.
+    FILE *src;                 // Source file.
+    FILE *dst;                 // Destination file.
+    struct lzw_dict dict;      // LZW dictionary used in decompression.
 };
 
 void lzw_init(
@@ -27,6 +27,10 @@ void lzw_init(
         size_t code_length_bits,
         char *src_name,
         char *dst_name
+);
+
+void lzw_deinit(
+        struct lzw_decompressor *lzw
 );
 
 void lzw_decompress(

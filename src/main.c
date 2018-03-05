@@ -26,16 +26,25 @@ int main(int argc, char *argv[]) {
         return EXIT_FAILURE;
     }
 
-    // Perform decompression.
+    /* Perform decompression. */
+
     struct lzw_decompressor lzw;
     lzw_init(&lzw, CODE_LENGTH_BITS, args.src_file, args.dst_file);
-    lzw_decompress(&lzw);
 
-    // Print if error and exit with failure.
     if (lzw_has_error(&lzw)) {
         fprintf(stderr, "ERROR: %s.\n", lzw_error_msg(&lzw));
         return EXIT_FAILURE;
     }
+
+    lzw_decompress(&lzw);
+
+    if (lzw_has_error(&lzw)) {
+        fprintf(stderr, "ERROR: %s.\n", lzw_error_msg(&lzw));
+        lzw_deinit(&lzw);
+        return EXIT_FAILURE;
+    }
+
+    lzw_deinit(&lzw);
 
     return EXIT_SUCCESS;
 }
