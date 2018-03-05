@@ -4,6 +4,7 @@
 
 #include <stddef.h>
 #include <stdbool.h>
+#include <stdio.h>
 
 enum lzw_error {
     LZW_UNKNOWN_ERROR,
@@ -17,6 +18,8 @@ struct lzw_decompressor {
     size_t code_length_bits;
     char *src_name;
     char *dst_name;
+    FILE *src;
+    FILE *dst;
 };
 
 void lzw_init(

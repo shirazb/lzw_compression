@@ -27,12 +27,25 @@ void lzw_init(
     lzw->code_length_bits = code_length_bits;
     lzw->src_name = src_name;
     lzw->dst_name = dst_name;
+
+    lzw->src = fopen(src_name, "rb");
+    if (!lzw->src) {
+        lzw->error = LZW_FAIL_OPEN_SRC;
+        return;
+    }
+
+    lzw->dst = fopen(dst_name, "wb");
+    if (!lzw->dst) {
+        lzw->error = LZW_FAIL_OPEN_DST;
+        return;
+    }
+
     lzw->error = LZW_OKAY;
 }
 
 /**
  * Decompresses an LZW compressed file.
- * TODO: Exact details from spec.
+ * TODO: Document exact details from spec.
  * @param lzw Defines parameters of LZW decompressor.
  * @return true if successful, false otherwise.
  */
