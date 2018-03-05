@@ -49,6 +49,8 @@ static enum lzw_error write_next(
         struct dict_entry *entry
 );
 
+static bool has_codes_remaining(struct lzw_decompressor *lzw);
+
 /**
  * Initialises a new LZW decompressor. Takes input from a binary file and
  * writes decompressed output to a binary file.
@@ -227,4 +229,15 @@ write_next(struct lzw_decompressor *lzw, struct dict_entry *entry) {
     );
 
     return entry->size == written ? LZW_OKAY : LZW_WRITE_DST_ERROR;
+}
+
+/**
+ * Checks if there are codes still left to be read from the source file.
+ */
+static bool has_codes_remaining(struct lzw_decompressor *lzw) {
+    assert(lzw);
+    assert(!lzw_has_error(lzw->error));
+    assert(lzw->src);
+
+    return feof(lzw->src) == 0;
 }
