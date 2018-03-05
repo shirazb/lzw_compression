@@ -8,11 +8,6 @@
 
 #define NUM_ASCII_VALUES 256
 
-static struct dict_entry {
-    size_t size;
-    uint8_t *bytes;
-};
-
 /* Mallocing each byte of the initial entries individually is inefficient.
  * Also, it is wasteful as these entries are always the same thing for
  * every dictionary, so they can be shared. Thus, keep one global ASCII
@@ -33,7 +28,7 @@ static void deinit_dict_entries(struct lzw_dict *dict);
  */
 void dict_init(struct lzw_dict *dict, size_t code_length_bits) {
     // FIXME: This is terrible. Ideally would use some kind of CPP for-loop to
-    // generate in-line the ASCII entries.
+    // generate in-line the ASCII entries at the declaration.
     if (!ascii_table_initialised) {
         initialise_ascii_table();
         ascii_table_initialised = true;
@@ -79,11 +74,23 @@ void dict_deinit(struct lzw_dict *dict) {
 }
 
 /**
+ * Checks if the code is in the dictionary.
+ */
+bool dict_contains(struct lzw_dict *dict, int code) {
+    // Equivalent to checking if the code is below the current size.
+    return code < dict->size;
+}
+
+/**
  * Adds to the dictionary an entry of the given size and the given bytes.
  *
  * Will reset the dictionary if it is full.
  */
-void dict_add(struct lzw_dict *dict, uint8_t *bytes, size_t size) {
+struct dict_entry *dict_add(
+        struct lzw_dict *dict,
+        uint8_t *bytes,
+        size_t size
+) {
     assert(dict);
 
     // If too big, reset dictionary.
@@ -92,10 +99,12 @@ void dict_add(struct lzw_dict *dict, uint8_t *bytes, size_t size) {
     }
 
     // Set size and bytes and increment dictionary size.
-    int i = dict->size;
-    dict->entries[i].size = size;
-    dict->entries[i].bytes = bytes;
     dict->size += 1;
+    struct dict_entry *new_entry = &dict->entries[dict->size];
+    new_entry->size = size;
+    new_entry->bytes = bytes;
+
+    return new_entry;
 }
 
 static void initialise_ascii_table(void) {
