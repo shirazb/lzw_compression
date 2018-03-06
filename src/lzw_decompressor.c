@@ -12,8 +12,8 @@
  */
 #define NUM_LZW_ERRORS 8
 static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
-        "Unknown error",
         "Okay",
+        "Unknown error",
         "Failed to open source file",
         "Failed to open destination file",
         "Heap error",
@@ -168,12 +168,11 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
     lzw->error = write_next(lzw, cur_entry);
     GUARD_ERROR(lzw);
 
-    struct dict_entry *last_entry;
+    struct dict_entry *last_entry = cur_entry;
 
     // Keep decompressing until all codes in the input file have been consumed.
     while (has_codes_remaining(lzw)) {
-        // Update last and cur entry.
-        last_entry = cur_entry;
+        // Update cur entry.
         lzw->error = read_and_lookup_next_code(lzw, &cur_entry);
         GUARD_ERROR(lzw);
 
@@ -205,6 +204,8 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
             lzw->error = write_next(lzw, new_entry);
             GUARD_ERROR(lzw);
         }
+
+        last_entry = cur_entry;
     }
 
     assert(!lzw_has_error(lzw->error));

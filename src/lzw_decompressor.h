@@ -8,8 +8,8 @@
 #include "lzw_dict.h"
 
 enum lzw_error {
-    LZW_UNKNOWN_ERROR,
     LZW_OKAY,
+    LZW_UNKNOWN_ERROR,
     LZW_OPEN_SRC_ERROR,
     LZW_OPEN_DST_ERROR,
     LZW_HEAP_ERROR,
