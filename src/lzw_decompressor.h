@@ -28,13 +28,10 @@ struct lzw_decompressor {
     /*
      * Used to read non-byte aligned amounts of data from the source file at
      * a time. See `read_next_code` in .c for more info.
-     *
-     * If the kth byte is being read, where k is odd, save it in `last_byte`
-     * so the next read call can use it (without having to seek backwards and
-     * re-read it).
      */
-    uint8_t last_byte;
-    bool odd;
+    uint8_t prev_bytes[2];     // Last two read bytes.
+    bool odd;                  // If next code to be read is k^th code, true if
+                               // k is odd, else false.
 };
 
 enum lzw_error lzw_init(
