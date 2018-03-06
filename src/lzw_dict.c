@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include "lzw_dict.h"
 
 #define NUM_ASCII_VALUES 256
@@ -39,7 +40,7 @@ void dict_init(struct lzw_dict *dict, size_t code_length_bits) {
     // TODO: Protect against ridiculously large array.
     // Init `size` and `capacity`. Capacity is `2^code_length_bits - 1`,
     // the number of items that can be represented by `code_length_bits` bits.
-    dict->size = 0;
+    dict->next_idx = 0;
     dict->capacity = (size_t) 1 << (code_length_bits);
 
     // TODO: Handle when capacity < size required for ASCII?
@@ -80,7 +81,7 @@ bool dict_contains(struct lzw_dict *dict, int code) {
     assert(dict);
 
     // Equivalent to checking if the code is below the current size.
-    return code < dict->size;
+    return code < dict->next_idx;
 }
 
 /**
@@ -96,16 +97,22 @@ struct dict_entry *dict_add(
     assert(dict);
 
     // If too big, reset dictionary.
-    if ((size_t) dict->size >= dict->capacity) {
+    if ((size_t) dict->next_idx >= dict->capacity) {
         reset_dict(dict);
     }
 
-    // Set size and bytes and increment dictionary size.
-    dict->size += 1;
-    struct dict_entry *new_entry = &dict->entries[dict->size];
+    // Set size and bytes and increment dictionary next index.
+    struct dict_entry *new_entry = &dict->entries[dict->next_idx];
     new_entry->size = size;
     new_entry->bytes = bytes;
 
+    char str[size + 1];
+    memcpy(str, bytes, size);
+    str[size] = '\0';
+    printf("DEBUG: dict_add(): Added \'%s\'. Size now %i\n", str,
+            dict->next_idx);
+
+    dict->next_idx += 1;
     return new_entry;
 }
 
@@ -136,7 +143,7 @@ static void reset_dict(struct lzw_dict *dict) {
     assert(dict);
 
     deinit_dict_entries(dict);
-    dict->size = NUM_ASCII_VALUES;
+    dict->next_idx = NUM_ASCII_VALUES;
 }
 
 /**
@@ -150,9 +157,8 @@ static void deinit_dict_entries(struct lzw_dict *dict) {
     // Free the `bytes` fields of each `dict_entry` as these were malloc'd.
     // Start at NUM_ASCII_VALUES as those before point to the statically
     // allocated ASCII table array.
-    // Stop at `dict->size` as the rest should be unused. If previously used,
-    // it should have already been freed.
-    for (int i = NUM_ASCII_VALUES; i < dict->size; i++) {
+    // Stop at `dict->next_idx` as the rest should be unused; not allocated.
+    for (int i = NUM_ASCII_VALUES; i < dict->next_idx; i++) {
         free(dict->entries[i].bytes);
     }
 }

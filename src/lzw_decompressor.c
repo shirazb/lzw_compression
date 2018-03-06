@@ -16,8 +16,6 @@ static enum lzw_error write_next(
         struct dict_entry *entry
 );
 
-static bool has_codes_remaining(struct lzw_decompressor *lzw);
-
 static struct dict_entry *lookup_code(struct lzw_decompressor *lzw, int code);
 
 static bool read_next_code(struct lzw_decompressor *lzw, int *code);
@@ -280,7 +278,7 @@ static enum lzw_error append_byte_and_add_to_dict(
 
     // Copy entry and extra byte into new memory.
     memcpy(new_bytes, entry->bytes, entry_size);
-    new_bytes[entry->size + 1] = b;
+    new_bytes[entry->size] = b;
 
     // Add new bytes to dictionary and assign to passed in new_entry pointer.
     *new_entry = dict_add(&lzw->dict, new_bytes, entry->size + 1);
@@ -302,17 +300,6 @@ write_next(struct lzw_decompressor *lzw, struct dict_entry *entry) {
     );
 
     return entry->size == written ? LZW_OKAY : LZW_WRITE_DST_ERROR;
-}
-
-/**
- * Checks if there are codes still left to be read from the source file.
- */
-static bool has_codes_remaining(struct lzw_decompressor *lzw) {
-    assert(lzw);
-    assert(!lzw_has_error(lzw->error));
-    assert(lzw->src);
-
-    return feof(lzw->src) == 0;
 }
 
 /**
@@ -365,7 +352,6 @@ bool read_next_code(struct lzw_decompressor *lzw, int *code) {
      */
     assert(lzw);
     assert(!lzw_has_error(lzw->error));
-    assert(has_codes_remaining(lzw));
 
     uint8_t data[3];
 

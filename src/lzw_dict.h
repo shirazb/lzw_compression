@@ -10,10 +10,10 @@ struct dict_entry {
 };
 
 struct lzw_dict {
-    /* Current size. Used as index of next entry, so keep as int not size_t.
+    /* Current size, or index of next entry.
        When comparing to capacity, cast this to size_t, not other way around,
        because int definitely fits in size_t. */
-    int size;
+    int next_idx;
 
     /* Capacity of array based on length of codes. */
     size_t capacity;
