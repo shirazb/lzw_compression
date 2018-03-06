@@ -24,6 +24,17 @@ struct lzw_decompressor {
     FILE *src;                 // Source file.
     FILE *dst;                 // Destination file.
     struct lzw_dict dict;      // LZW dictionary used in decompression.
+
+    /*
+     * Used to read non-byte aligned amounts of data from the source file at
+     * a time. See `read_next_code` in .c for more info.
+     *
+     * If the kth byte is being read, where k is odd, save it in `last_byte`
+     * so the next read call can use it (without having to seek backwards and
+     * re-read it).
+     */
+    uint8_t last_byte;
+    bool odd;
 };
 
 enum lzw_error lzw_init(

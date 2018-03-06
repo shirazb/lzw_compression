@@ -39,6 +39,21 @@ static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
     }\
 }
 
+/**
+ * Generates code that:
+ * Takes a `uint8_t` called `param` and reads one byte from `lzw->src` into it.
+ * Then, if read failed, returns false.
+ */
+#define read_byte_into_and_return_false_if_fail(param, lzw)\
+{ \
+    FILE *src = (lzw)->src; \
+    size_t num_read = fread(&(param), sizeof(uint8_t), 1, src); \
+    if (num_read != 1) return false; \
+}
+
+#define BYTE_IN_BITS 8
+#define HALF_BYTE_IN_BITS 4
+
 static enum lzw_error append_byte_and_add_to_dict(
         struct lzw_decompressor *lzw,
         struct dict_entry *entry,
@@ -57,6 +72,9 @@ static enum lzw_error read_and_lookup_next_code(
         struct lzw_decompressor *lzw,
         struct dict_entry **cur_entry
 );
+
+static bool read_next_code(struct lzw_decompressor *lzw, int *code);
+
 
 /**
  * Initialises a new LZW decompressor. Takes input from a binary file and
@@ -94,6 +112,10 @@ enum lzw_error lzw_init(
 
     /* Initialise dictionary. */
     dict_init(&lzw->dict, lzw->code_length_bits);
+
+    /* State for reading 12 bytes a time. */
+    lzw->odd = true;
+    lzw->last_byte = 0;
 
     lzw->error = LZW_OKAY;
     return LZW_OKAY;
@@ -158,10 +180,11 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
         // If code is in the dictionary, write the current entry and add
         // <last entry><first byte of cur entry> to dictionary.
         if (cur_entry) {
+            assert(cur_entry->bytes);
+
             lzw->error = write_next(lzw, cur_entry);
             GUARD_ERROR(lzw);
 
-            // FIXME: null ptr on cur_entry->bytes?
             struct dict_entry *new_entry;
             lzw->error = append_byte_and_add_to_dict(
                     lzw, last_entry, cur_entry->bytes[0], &new_entry
@@ -171,6 +194,8 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
         // If code is not in the dictionary, add <last entry><first byte of
         // last entry> to the dictionary, and write that to the output.
         } else {
+            assert(last_entry->bytes);
+
             struct dict_entry *new_entry;
             lzw->error = append_byte_and_add_to_dict(
                     lzw, last_entry, last_entry->bytes[0], &new_entry
@@ -290,10 +315,82 @@ static enum lzw_error read_and_lookup_next_code(
     assert(lzw->src);
     assert(has_codes_remaining(lzw));
 
-    // TODO: Read code.
-    int code = 0;
+    int code;
+    bool read_success = read_next_code(lzw, &code);
 
+    if (!read_success) {
+        lzw->error = LZW_READ_ERROR;
+        return LZW_READ_ERROR;
+    }
+
+    // Lookup code in dictionary
     *cur_entry = dict_get(&lzw->dict, code);
 
     return LZW_OKAY;
+}
+
+/**
+ * Reads the next code from src file, storing it in the provided pointer.
+ * Returns true if success, false otherwise.
+ */
+static bool read_next_code(struct lzw_decompressor *lzw, int *code) {
+    /*
+     * Need to read from the source file 12 bits a time, but can only read 8
+     * bits a time. If on first call two bytes are read, do not want to discard
+     * second byte and re-read it on second call as seeking backwards
+     * through file is slow. Thus, store the last byte in the decompressor
+     * struct.
+     *
+     * Two codes fits flush into three bytes (each are 24 bits). Thus, the
+     * pattern for reading codes repeats every three bytes. That is:
+     *     - On odd calls, we read two bytes. We want the first byte plus the
+     *       first half of the second byte. We then cache the second byte in the
+     *       struct.
+     *     - On even calls, we read one more byte. We want the cached byte and
+     *       the second half of the newly read byte.
+     *
+     * On odd calls, if after reading the two bytes the end of file is reached,
+     * these two bytes become the code.
+     */
+
+    uint8_t byte0;
+    uint8_t byte1;
+
+    if (lzw->odd) {
+        // Declare new `uint8_t`s and read the first and second bytes into them.
+        read_byte_into_and_return_false_if_fail(byte0, lzw);
+        read_byte_into_and_return_false_if_fail(byte1, lzw);
+
+        if (has_codes_remaining(lzw)) {
+            /*
+             * If odd and not last code: Left shift the first byte by 4 to make
+             * room for the remaining 4 bits of the code, taken from the top of
+             * the second byte.
+             */
+            *code = (((int) byte0) << HALF_BYTE_IN_BITS) |
+                    (int) (byte1 >> HALF_BYTE_IN_BITS);
+        } else {
+            /*
+             * If odd and last code: Left shift the first byte by 8 to make
+             * room for the entire second byte as the second half of the
+             * 16-bit code.
+             */
+            *code = (((int) byte0) << BYTE_IN_BITS) | (int) byte1;
+        }
+    } else {
+        /*
+         * If even: Left shift the first byte by 4 to discard the first 4
+         * bits. Then, extend and left shift by a further 4, so there is
+         * now 8 bits on the right for the second byte.
+         */
+        byte0 = lzw->last_byte;
+        read_byte_into_and_return_false_if_fail(byte1, lzw);
+        *code = (((int) (byte0 << HALF_BYTE_IN_BITS)) << HALF_BYTE_IN_BITS) |
+                (int) byte1;
+    }
+
+    lzw->last_byte = byte1;
+    lzw->odd = !lzw->odd;
+
+    return true;
 }
