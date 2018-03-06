@@ -3,11 +3,11 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include "lzw_dict.h"
 
 #define NUM_ASCII_VALUES 256
+#define CODE_WIDTH_BITS 12
 
 /* Mallocing each byte of the initial entries individually is inefficient.
  * Also, it is wasteful as these entries are always the same thing for
@@ -24,10 +24,9 @@ static void deinit_dict_entries(struct lzw_dict *dict);
 /**
  * Initialises an LZW dictionary.
  * @param dict The `struct lzw_dict` to initialise.
- * @param code_length_bits The length of codes in the source file, which will
  * determine the capacity of the dictionary.
  */
-void dict_init(struct lzw_dict *dict, size_t code_length_bits) {
+void dict_init(struct lzw_dict *dict) {
     // FIXME: This is terrible. Ideally would use some kind of CPP for-loop to
     // generate in-line the ASCII entries at the declaration.
     if (!ascii_table_initialised) {
@@ -41,7 +40,7 @@ void dict_init(struct lzw_dict *dict, size_t code_length_bits) {
     // Init `size` and `capacity`. Capacity is `2^code_length_bits - 1`,
     // the number of items that can be represented by `code_length_bits` bits.
     dict->next_idx = 0;
-    dict->capacity = (size_t) 1 << (code_length_bits);
+    dict->capacity = (size_t) 1 << CODE_WIDTH_BITS;
 
     // TODO: Handle when capacity < size required for ASCII?
 
@@ -105,12 +104,6 @@ struct dict_entry *dict_add(
     struct dict_entry *new_entry = &dict->entries[dict->next_idx];
     new_entry->size = size;
     new_entry->bytes = bytes;
-
-    char str[size + 1];
-    memcpy(str, bytes, size);
-    str[size] = '\0';
-    printf("DEBUG: dict_add(): Added \'%s\'. Size now %i\n", str,
-            dict->next_idx);
 
     dict->next_idx += 1;
     return new_entry;

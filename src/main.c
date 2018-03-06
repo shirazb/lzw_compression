@@ -5,7 +5,6 @@
 #include "lzw_decompressor.h"
 
 #define REQUIRED_ARGC 3
-#define CODE_LENGTH_BITS 12
 
 static struct args {
     bool error;
@@ -31,7 +30,6 @@ int main(int argc, char *argv[]) {
     struct lzw_decompressor lzw;
     enum lzw_error error = lzw_init(
             &lzw,
-            CODE_LENGTH_BITS,
             args.src_file,
             args.dst_file
     );

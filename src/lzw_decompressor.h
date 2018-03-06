@@ -20,7 +20,6 @@ enum lzw_error {
 
 struct lzw_decompressor {
     enum lzw_error error;      // Error code.
-    size_t code_length_bits;   // Length of codes in the source file in bits.
     FILE *src;                 // Source file.
     FILE *dst;                 // Destination file.
     struct lzw_dict dict;      // LZW dictionary used in decompression.
@@ -36,7 +35,6 @@ struct lzw_decompressor {
 
 enum lzw_error lzw_init(
         struct lzw_decompressor *lzw,
-        size_t code_length_bits,
         char *src_name,
         char *dst_name
 );

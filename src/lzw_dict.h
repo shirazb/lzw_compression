@@ -30,8 +30,7 @@ struct lzw_dict {
 };
 
 void dict_init(
-        struct lzw_dict *dict,
-        size_t code_length_bits
+        struct lzw_dict *dict
 );
 
 bool dict_contains(

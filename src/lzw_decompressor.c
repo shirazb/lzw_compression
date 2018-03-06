@@ -90,15 +90,10 @@ void print_bin(uint8_t byte)
  */
 enum lzw_error lzw_init(
         struct lzw_decompressor *lzw,
-        size_t code_length_bits,
         char *src_name,
         char *dst_name
 ) {
     assert(lzw);
-
-    /* Code length. */
-
-    lzw->code_length_bits = code_length_bits;
 
     /* Open source and destination files. */
 
@@ -115,7 +110,7 @@ enum lzw_error lzw_init(
     }
 
     /* Initialise dictionary. */
-    dict_init(&lzw->dict, lzw->code_length_bits);
+    dict_init(&lzw->dict);
 
     /* Initialise odd to true, as next byte to be read is the first. */
     lzw->odd = true;
