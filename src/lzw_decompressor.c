@@ -146,10 +146,8 @@ void lzw_deinit(struct lzw_decompressor *lzw) {
  * Decompresses an LZW compressed file.
  * TODO: Document exact details from spec.
  *
- * Will de-initialise the `lzw_decompressor` internally (free memory, close
- * files, etc).
- * @param lzw Defines parameters of LZW decompressor.
- * @return true if successful, false otherwise.
+ * @param lzw The initialised LZW decompressor.
+ * @return LZW_OKAY if successful, otherwise the error encountered.
  */
 enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
     assert(lzw);
@@ -286,8 +284,10 @@ static enum lzw_error append_byte_and_add_to_dict(
     return LZW_OKAY;
 }
 
-static enum lzw_error
-write_next(struct lzw_decompressor *lzw, struct dict_entry *entry) {
+static enum lzw_error write_next(
+        struct lzw_decompressor *lzw,
+        struct dict_entry *entry
+) {
     assert(lzw);
     assert(!lzw_has_error(lzw->error));
     assert(lzw->dst);
