@@ -4,6 +4,26 @@
 #include <string.h>
 #include "lzw_decompressor.h"
 
+static enum lzw_error append_byte_and_add_to_dict(
+        struct lzw_decompressor *lzw,
+        struct dict_entry *entry,
+        uint8_t b,
+        struct dict_entry **new_entry
+);
+
+static enum lzw_error write_next(
+        struct lzw_decompressor *lzw,
+        struct dict_entry *entry
+);
+
+static bool has_codes_remaining(struct lzw_decompressor *lzw);
+
+static struct dict_entry *lookup_code(struct lzw_decompressor *lzw, int code);
+
+static bool read_next_code(struct lzw_decompressor *lzw, int *code);
+
+/******************************************************************************/
+
 /* To add a new type of error:
  *     1. Add it to `enum lzw_error` in the header.
  *     2. Increment `NUM_LZW_ERRORS`.
@@ -61,25 +81,6 @@ void print_bin(uint8_t byte)
 #define print_bin(X) (void)0;
 #endif
 
-static enum lzw_error append_byte_and_add_to_dict(
-        struct lzw_decompressor *lzw,
-        struct dict_entry *entry,
-        uint8_t b,
-        struct dict_entry **new_entry
-);
-
-static enum lzw_error write_next(
-        struct lzw_decompressor *lzw,
-        struct dict_entry *entry
-);
-
-static bool has_codes_remaining(struct lzw_decompressor *lzw);
-
-static struct dict_entry *lookup_code(struct lzw_decompressor *lzw, int code);
-
-static bool read_next_code(struct lzw_decompressor *lzw, int *code);
-
-
 /**
  * Initialises a new LZW decompressor. Takes input from a binary file and
  * writes decompressed output to a binary file.
@@ -87,6 +88,7 @@ static bool read_next_code(struct lzw_decompressor *lzw, int *code);
  * @param code_length_bits The length in bits of the codes in the source.
  * @param src_name Path to the source file.
  * @param dst_name Path to the destination file.
+ * @return LZW_OKAY if no error, otherwise the error encountered.
  */
 enum lzw_error lzw_init(
         struct lzw_decompressor *lzw,
@@ -189,7 +191,7 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
         assert(last_entry);
 
         // If code is in the dictionary, write the current entry and add
-        // <last entry><first byte of cur entry> to dictionary.
+        // <last entry><first byte of cur entry> to dictionary. Update last.
         if (cur_entry) {
             assert(cur_entry->bytes);
 
@@ -334,9 +336,7 @@ static struct dict_entry *lookup_code(struct lzw_decompressor *lzw, int code) {
  * was some kind of read error, sets `lzw->error` to `LZW_READ_ERROR` and
  * returns false.
  */
-static int i = 0;
 bool read_next_code(struct lzw_decompressor *lzw, int *code) {
-    i++;
     /*
      * Need to take codes from the source file 12 bits a time, but can only
      * read 8 bits a time. Two codes fits flush into three bytes (each are 24
