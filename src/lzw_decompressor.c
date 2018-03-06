@@ -42,15 +42,16 @@ static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
 /**
  * Generates code that:
  * Takes a `uint8_t` called `param` and reads one byte from `lzw->src` into it.
- * Then, if read failed, returns false.
+ * Then, if read failed, returns LZW_READ_ERROR.
  */
-#define read_byte_into_and_return_false_if_fail(param, lzw)\
+#define read_byte_into_and_return_error_if_fail(param, lzw)\
 { \
     FILE *src = (lzw)->src; \
     size_t num_read = fread(&(param), sizeof(uint8_t), 1, src); \
-    if (num_read != 1) return false; \
+    if (num_read != 1) return LZW_READ_ERROR; \
 }
 
+/* Used when reading bytes. See `read_next_code`. */
 #define BYTE_IN_BITS 8
 #define HALF_BYTE_IN_BITS 4
 
@@ -68,12 +69,9 @@ static enum lzw_error write_next(
 
 static bool has_codes_remaining(struct lzw_decompressor *lzw);
 
-static enum lzw_error read_and_lookup_next_code(
-        struct lzw_decompressor *lzw,
-        struct dict_entry **cur_entry
-);
+static struct dict_entry *lookup_code(struct lzw_decompressor *lzw, int code);
 
-static bool read_next_code(struct lzw_decompressor *lzw, int *code);
+static enum lzw_error read_next_code(struct lzw_decompressor *lzw, int *code);
 
 
 /**
@@ -154,9 +152,13 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
     GUARD_ERROR(lzw);
 
     // Read the first code and look it up in the dictionary.
+    int cur_code;
     struct dict_entry *cur_entry;
-    lzw->error = read_and_lookup_next_code(lzw, &cur_entry);
+
+    lzw->error = read_next_code(lzw, &cur_code);
     GUARD_ERROR(lzw);
+
+    cur_entry = lookup_code(lzw, cur_code);
 
     // First code should be in the dictionary, otherwise invalid encoding.
     if (!cur_entry) {
@@ -168,13 +170,20 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
     lzw->error = write_next(lzw, cur_entry);
     GUARD_ERROR(lzw);
 
-    struct dict_entry *last_entry = cur_entry;
+    int last_code = cur_code;
+    struct dict_entry *last_entry;
 
     // Keep decompressing until all codes in the input file have been consumed.
     while (has_codes_remaining(lzw)) {
-        // Update cur entry.
-        lzw->error = read_and_lookup_next_code(lzw, &cur_entry);
+        // Update cur code, cur entry, and last entry. Last code updated at
+        // end of loop.
+        lzw->error = read_next_code(lzw, &cur_code);
         GUARD_ERROR(lzw);
+        cur_entry = lookup_code(lzw, cur_code);
+        last_entry = lookup_code(lzw, last_code);
+
+        // TODO: Should this be an assert? Should it even be here?
+        assert(last_entry);
 
         // If code is in the dictionary, write the current entry and add
         // <last entry><first byte of cur entry> to dictionary.
@@ -189,6 +198,8 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
                     lzw, last_entry, cur_entry->bytes[0], &new_entry
             );
             GUARD_ERROR(lzw);
+
+            last_code = cur_code;
 
         // If code is not in the dictionary, add <last entry><first byte of
         // last entry> to the dictionary, and write that to the output.
@@ -205,7 +216,6 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
             GUARD_ERROR(lzw);
         }
 
-        last_entry = cur_entry;
     }
 
     assert(!lzw_has_error(lzw->error));
@@ -299,42 +309,25 @@ static bool has_codes_remaining(struct lzw_decompressor *lzw) {
 }
 
 /**
- * Reads the next code from the source file, looks it up in the dictionary.
- * Sets `cur_entry` to be the returned entry (null if not present). Returns
- * an error code, erroring if the read failed. Note, the code not being in
- * the dictionary is ok, so does not result in an error.
- * @param lzw The decompressor.
- * @param cur_entry The entry found in the dictionary will be assigned to this.
- * @return LZW_READ_ERROR if error whilst reading, else LZW_OKAY.
+ * Looks up the given code in the dictionary.
+ *
+ * TODO: When are codes invalid? If possible, refactor to return error.
+ * @param lzw The decompressor whose dictionary the code will be looked up in.
+ * @param code The code to look up.
+ * @return The `struct dict_entry *` found in the dictionary. NULL if not found.
  */
-static enum lzw_error read_and_lookup_next_code(
-        struct lzw_decompressor *lzw,
-        struct dict_entry **cur_entry
-) {
+static struct dict_entry *lookup_code(struct lzw_decompressor *lzw, int code) {
     assert(lzw);
     assert(!lzw_has_error(lzw->error));
-    assert(lzw->src);
-    assert(has_codes_remaining(lzw));
 
-    int code;
-    bool read_success = read_next_code(lzw, &code);
-
-    if (!read_success) {
-        lzw->error = LZW_READ_ERROR;
-        return LZW_READ_ERROR;
-    }
-
-    // Lookup code in dictionary
-    *cur_entry = dict_get(&lzw->dict, code);
-
-    return LZW_OKAY;
+    return dict_get(&lzw->dict, code);
 }
 
 /**
  * Reads the next code from src file, storing it in the provided pointer.
- * Returns true if success, false otherwise.
+ * Returns LZW_OKAY if success, LZW_READ_ERROR otherwise.
  */
-static bool read_next_code(struct lzw_decompressor *lzw, int *code) {
+static enum lzw_error read_next_code(struct lzw_decompressor *lzw, int *code) {
     /*
      * Need to read from the source file 12 bits a time, but can only read 8
      * bits a time. If on first call two bytes are read, do not want to discard
@@ -359,8 +352,8 @@ static bool read_next_code(struct lzw_decompressor *lzw, int *code) {
 
     if (lzw->odd) {
         // Declare new `uint8_t`s and read the first and second bytes into them.
-        read_byte_into_and_return_false_if_fail(byte0, lzw);
-        read_byte_into_and_return_false_if_fail(byte1, lzw);
+        read_byte_into_and_return_error_if_fail(byte0, lzw);
+        read_byte_into_and_return_error_if_fail(byte1, lzw);
 
         if (has_codes_remaining(lzw)) {
             /*
@@ -385,7 +378,7 @@ static bool read_next_code(struct lzw_decompressor *lzw, int *code) {
          * now 8 bits on the right for the second byte.
          */
         byte0 = lzw->last_byte;
-        read_byte_into_and_return_false_if_fail(byte1, lzw);
+        read_byte_into_and_return_error_if_fail(byte1, lzw);
         *code = (((int) (byte0 << HALF_BYTE_IN_BITS)) << HALF_BYTE_IN_BITS) |
                 (int) byte1;
     }
@@ -393,5 +386,5 @@ static bool read_next_code(struct lzw_decompressor *lzw, int *code) {
     lzw->last_byte = byte1;
     lzw->odd = !lzw->odd;
 
-    return true;
+    return LZW_OKAY;
 }
