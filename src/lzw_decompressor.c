@@ -247,6 +247,10 @@ static enum lzw_error append_byte_and_add_to_dict(
 
 static enum lzw_error
 write_next(struct lzw_decompressor *lzw, struct dict_entry *entry) {
+    assert(lzw);
+    assert(!lzw_has_error(lzw->error));
+    assert(lzw->dst);
+
     size_t written = fwrite(
             entry->bytes,
             sizeof(uint8_t),

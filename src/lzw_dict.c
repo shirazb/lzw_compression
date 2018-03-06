@@ -119,7 +119,7 @@ struct dict_entry *dict_get(
 ) {
     assert(dict);
 
-    return dict_contains(dict, code) ? dict->entries[code] : NULL;
+    return dict_contains(dict, code) ? &dict->entries[code] : NULL;
 }
 
 static void initialise_ascii_table(void) {
