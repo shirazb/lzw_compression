@@ -24,7 +24,6 @@ static void deinit_dict_entries(struct lzw_dict *dict);
 /**
  * Initialises an LZW dictionary.
  * @param dict The `struct lzw_dict` to initialise.
- * determine the capacity of the dictionary.
  * @return true if initialisation successful, false otherwise.
  */
 bool dict_init(struct lzw_dict *dict) {
@@ -38,8 +37,8 @@ bool dict_init(struct lzw_dict *dict) {
     assert(dict);
 
     // TODO: Protect against ridiculously large array.
-    // Init `size` and `capacity`. Capacity is `2^code_length_bits - 1`,
-    // the number of items that can be represented by `code_length_bits` bits.
+    // Init `size` and `capacity`. Capacity is `2^CODE_WIDTH_BITS - 1`,
+    // the number of items that can be represented by `CODE_WIDTH_BITS` bits.
     dict->next_idx = 0;
     dict->capacity = (size_t) 1 << CODE_WIDTH_BITS;
 
@@ -47,9 +46,8 @@ bool dict_init(struct lzw_dict *dict) {
 
     /* Malloc and initialise entries array. */
 
-    // Allocate entire array now as not actually that big. Although capacity
-    // varies exponentially with `code_length_bits`, check before that
-    // capacity is not too large.
+    // Allocate entire array now as not actually that big. Should check
+    // before if dictionary size too large.
     dict->entries = malloc(sizeof(struct dict_entry) * dict->capacity);
     if (!dict->entries) {
         return false;
@@ -71,7 +69,6 @@ void dict_deinit(struct lzw_dict *dict) {
 
     deinit_dict_entries(dict);
 
-    // Free the entries array.
     free(dict->entries);
 }
 
