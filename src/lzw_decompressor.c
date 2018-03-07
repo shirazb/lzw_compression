@@ -355,7 +355,7 @@ bool read_next_code(struct lzw_decompressor *lzw, int *code) {
      *
      * <b7 - b0><b15 - b12> is the first code.
      * <b11 - b8><b23 - b16> is the second code.
-     * The first code starts aligned with the next byte.
+     * The third code starts aligned with the next byte.
      *
      * Thus, the pattern for reading codes repeats every three bytes. Thus:
      *     - On odd calls, we read three bytes. We want the first byte plus the
@@ -364,8 +364,8 @@ bool read_next_code(struct lzw_decompressor *lzw, int *code) {
      *     - On even calls, we use the bytes cached in the struct. We want
      *       the second half of the first byte plus the second byte.
      *
-     * We also need to handle reaching the EOF. If on an odd call, no bytes
-     * at all can be read, there was an even number of codes, so the last
+     * We also need to handle reaching the EOF. If on an odd call no bytes
+     * at all can be read, there was an even number of codes, so the previous
      * call dealt with the last code. If two bytes can be read but not the
      * third, there is an odd number of codes, so the two read bytes become
      * the padded 16-bit code.
@@ -373,13 +373,14 @@ bool read_next_code(struct lzw_decompressor *lzw, int *code) {
     assert(lzw);
     assert(!lzw_has_error(lzw->error));
 
+    // Will read data into here.
     uint8_t data[3];
 
     if (lzw->odd) {
         // Try to read two bytes.
         size_t n = fread(data, sizeof(uint8_t), 2, lzw->src);
 
-        // If could not read any bytes: EOF and even number of codes. Last
+        // If could not read any bytes: EOF and even number of codes. Previous
         // call dealt with them.
         if (n == 0) {
             return false;
@@ -397,7 +398,7 @@ bool read_next_code(struct lzw_decompressor *lzw, int *code) {
         n += fread(&data[2], sizeof(uint8_t), 1, lzw->src);
 
         /*
-         * If code not read a third byte: EOF and odd number of codes.
+         * If could not read a third byte: EOF and odd number of codes.
          *
          * Left shift the first byte by 8 to make room for the entire second
          * byte as the second half of the 16-bit code.
