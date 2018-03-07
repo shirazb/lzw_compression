@@ -3,7 +3,7 @@ LZW compression of binary files in C.
 
 Uses 12-bit fixed width codes. If odd number of codes, last two bytes form a padded 12-bit code.
 Dictionary is initialised as an ASCII table.
-If dictionary size exceeds 2^12 - 1, resets to ASCII table.
+If dictionary size exceeds 2^12, resets to ASCII table.
 
 # Build
 See `CMakeLists.txt`, should be simple cmake command. The executable `lzw_decompressor` will be placed in the `bin/` directory.
