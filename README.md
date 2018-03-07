@@ -6,10 +6,10 @@ Dictionary is initialised as an ASCII table.
 If dictionary size exceeds 2^12 - 1, resets to ASCII table.
 
 # Build
-See `CMakeLists.txt`, should be simple cmake command.
+See `CMakeLists.txt`, should be simple cmake command. The executable `lzw_decompressor` will be placed in the `bin/` directory.
 
 # Usage
-`./lzw_decompressor <src_file> <dst_file>`
+`lzw_decompressor <src_file> <dst_file>`
 
 # The LZW Decompressor Module
 

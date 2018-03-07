@@ -4,7 +4,7 @@ project(lzw_compression)
 # Set up executable and library locations.
 
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY
-        ${CMAKE_HOME_DIRECTORY})
+        ${CMAKE_HOME_DIRECTORY}/bin)
 
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY
         ${CMAKE_HOME_DIRECTORY}/lib)
