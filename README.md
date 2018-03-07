@@ -25,13 +25,15 @@ enum lzw_error error = lzw_init(&lzw, src_file_path, dst_file_path);
 if (lzw_has_error(error) {
    // Handle
    char *err_msg = lzw_error_msg(error);
-}
+} else {
+    error = lzw_decompress(&lzw);
 
-error = lzw_decompress(&lzw);
+    if (lzw_has_error(error) {
+       // Handle
+       char *err_msg = lzw_error_msg(error);
+    }
 
-if (lzw_has_error(error) {
-   // Handle
-   char *err_msg = lzw_error_msg(error);
+    lzw_deinit(&lzw);
 }
 
 ```
