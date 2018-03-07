@@ -4,6 +4,10 @@
 #include <string.h>
 #include "lzw_decompressor.h"
 
+
+/**************************   Prototypes   ************************************/
+
+
 static enum lzw_error append_byte_and_add_to_dict(
         struct lzw_decompressor *lzw,
         struct dict_entry *entry,
@@ -20,7 +24,9 @@ static struct dict_entry *lookup_code(struct lzw_decompressor *lzw, int code);
 
 static bool read_next_code(struct lzw_decompressor *lzw, int *code);
 
-/******************************************************************************/
+
+/****************************   Macros   **************************************/
+
 
 /* To add a new type of error:
  *     1. Add it to `enum lzw_error` in the header.
@@ -49,12 +55,26 @@ static char const *lzw_error_msgs[NUM_LZW_ERRORS] = {
  *
  * Declares this variable in a new scope to avoid name clashes.
  */
-#define GUARD_ERROR(lzw)\
+#define GUARD_ANY(lzw)\
 {\
     enum lzw_error __error = (lzw)->error; \
     if (lzw_has_error(__error)) { \
         return __error; \
     }\
+}
+
+/**
+ * Generates code that: if `cond` will set `lzw->error` to `error` and return
+ * `error.
+ */
+#define GUARD(cond, e, lzw)\
+{ \
+    struct lzw_decompressor *__l = lzw; \
+    enum lzw_error __e = e; \
+    if (cond) { \
+        __l->error = __e; \
+        return __e; \
+    } \
 }
 
 /* Used when reading bytes. See `read_next_code`. */
@@ -79,6 +99,10 @@ void print_bin(uint8_t byte)
 #define print_bin(X) (void)0;
 #endif
 
+
+/****************************   Public API   **********************************/
+
+
 /**
  * Initialises a new LZW decompressor. Takes input from a binary file and
  * writes decompressed output to a binary file.
@@ -98,19 +122,16 @@ enum lzw_error lzw_init(
     /* Open source and destination files. */
 
     lzw->src = src_name ? fopen(src_name, "rb") : NULL;
-    if (!lzw->src) {
-        lzw->error = LZW_OPEN_SRC_ERROR;
-        return LZW_OPEN_SRC_ERROR;
-    }
+    GUARD(!lzw->src, LZW_OPEN_SRC_ERROR, lzw);
 
     lzw->dst = dst_name ? fopen(dst_name, "wb") : NULL;
-    if (!lzw->dst) {
-        lzw->error = LZW_OPEN_DST_ERROR;
-        return LZW_OPEN_DST_ERROR;
-    }
+    GUARD(!lzw->dst, LZW_OPEN_DST_ERROR, lzw);
 
     /* Initialise dictionary. */
-    dict_init(&lzw->dict);
+    bool dict_init_success = dict_init(&lzw->dict);
+    // TODO: Implement proper dictionary errors. Right now, only can
+    // error due to failed malloc.
+    GUARD(!dict_init_success, LZW_HEAP_ERROR, lzw);
 
     /* Initialise odd to true, as next byte to be read is the first. */
     lzw->odd = true;
@@ -147,26 +168,23 @@ void lzw_deinit(struct lzw_decompressor *lzw) {
 enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
     assert(lzw);
 
-    GUARD_ERROR(lzw);
+    GUARD_ANY(lzw);
 
     // Read the first code and look it up in the dictionary.
     int cur_code;
     struct dict_entry *cur_entry;
 
     read_next_code(lzw, &cur_code);
-    GUARD_ERROR(lzw);
+    GUARD_ANY(lzw);
 
     cur_entry = lookup_code(lzw, cur_code);
 
     // First code should be in the dictionary, otherwise invalid encoding.
-    if (!cur_entry) {
-        lzw->error = LZW_INVALID_FORMAT_ERROR;
-        return lzw->error;
-    }
+    GUARD(!cur_entry, LZW_INVALID_FORMAT_ERROR, lzw);
 
     // Write the first retrieved entry to the output.
     lzw->error = write_next(lzw, cur_entry);
-    GUARD_ERROR(lzw);
+    GUARD_ANY(lzw);
 
     int last_code = cur_code;
     struct dict_entry *last_entry;
@@ -187,13 +205,13 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
             assert(cur_entry->bytes);
 
             lzw->error = write_next(lzw, cur_entry);
-            GUARD_ERROR(lzw);
+            GUARD_ANY(lzw);
 
             struct dict_entry *new_entry;
             lzw->error = append_byte_and_add_to_dict(
                     lzw, last_entry, cur_entry->bytes[0], &new_entry
             );
-            GUARD_ERROR(lzw);
+            GUARD_ANY(lzw);
 
             last_code = cur_code;
 
@@ -206,16 +224,16 @@ enum lzw_error lzw_decompress(struct lzw_decompressor *lzw) {
             lzw->error = append_byte_and_add_to_dict(
                     lzw, last_entry, last_entry->bytes[0], &new_entry
             );
-            GUARD_ERROR(lzw);
+            GUARD_ANY(lzw);
 
             lzw->error = write_next(lzw, new_entry);
-            GUARD_ERROR(lzw);
+            GUARD_ANY(lzw);
         }
 
     }
 
     // Could have been a read error.
-    GUARD_ERROR(lzw);
+    GUARD_ANY(lzw);
 
     return lzw->error;
 }
@@ -243,6 +261,10 @@ const char *lzw_error_msg(enum lzw_error error) {
     return lzw_error_msgs[error];
 }
 
+
+/*****************************   Helpers   ************************************/
+
+
 /**
  * In newly allocated memory, copies over the given entry plus the given byte
  * appended at the end, then inserts this into the dictionary. Places the
@@ -260,6 +282,9 @@ static enum lzw_error append_byte_and_add_to_dict(
         uint8_t b,
         struct dict_entry **new_entry
 ) {
+    assert(lzw);
+    assert(!lzw_has_error(lzw->error));
+
     size_t entry_size = sizeof(uint8_t) * entry->size;
     size_t new_entry_size = sizeof(uint8_t) * (entry->size + 1);
 

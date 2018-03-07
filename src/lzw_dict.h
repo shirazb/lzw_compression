@@ -29,7 +29,7 @@ struct lzw_dict {
     struct dict_entry *entries;
 };
 
-void dict_init(
+bool dict_init(
         struct lzw_dict *dict
 );
 

@@ -25,8 +25,9 @@ static void deinit_dict_entries(struct lzw_dict *dict);
  * Initialises an LZW dictionary.
  * @param dict The `struct lzw_dict` to initialise.
  * determine the capacity of the dictionary.
+ * @return true if initialisation successful, false otherwise.
  */
-void dict_init(struct lzw_dict *dict) {
+bool dict_init(struct lzw_dict *dict) {
     // FIXME: This is terrible. Ideally would use some kind of CPP for-loop to
     // generate in-line the ASCII entries at the declaration.
     if (!ascii_table_initialised) {
@@ -51,14 +52,15 @@ void dict_init(struct lzw_dict *dict) {
     // capacity is not too large.
     dict->entries = malloc(sizeof(struct dict_entry) * dict->capacity);
     if (!dict->entries) {
-        // TODO: Handle properly.
-        return;
+        return false;
     }
 
     // Initialise dictionary with ASCII table.
     for (int i = 0; i < NUM_ASCII_VALUES; i++) {
         dict_add(dict, &ascii_table[i], 1);
     }
+
+    return true;
 }
 
 /**
