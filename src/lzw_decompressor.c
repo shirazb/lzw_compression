@@ -96,7 +96,7 @@ void print_bin(uint8_t byte)
     putchar('\n');
 }
 #else
-#define print_bin(X) (void)0;
+#define print_bin(X) (void)0
 #endif
 
 
